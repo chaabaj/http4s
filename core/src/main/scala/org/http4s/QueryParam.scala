@@ -3,7 +3,7 @@ package org.http4s
 import cats.{Contravariant, Functor, MonoidK, Show}
 import cats.data.{Validated, ValidatedNel}
 import cats.implicits._
-import java.time.Instant
+import java.time.{Instant, LocalDate, ZonedDateTime}
 import java.time.format.{DateTimeFormatter, DateTimeParseException}
 import java.time.temporal.TemporalAccessor
 
@@ -62,6 +62,23 @@ object QueryParamCodec {
       .from[Instant](instantQueryParamDecoder(formatter), instantQueryParamEncoder(formatter))
   }
 
+  def zonedDateTimeQueryParamCodec(formatter: DateTimeFormatter): QueryParamCodec[ZonedDateTime] = {
+    import QueryParamDecoder.zonedDateTimeQueryParamDecoder
+    import QueryParamEncoder.zonedDateTimeQueryParamEncoder
+
+    QueryParamCodec.from[ZonedDateTime](
+      zonedDateTimeQueryParamDecoder(formatter), zonedDateTimeQueryParamEncoder(formatter)
+    )
+  }
+
+  def localDateQueryParamCodec(formatter: DateTimeFormatter): QueryParamCodec[LocalDate] = {
+    import QueryParamEncoder.localDateQueryParamEncoder
+    import QueryParamDecoder.localDateQueryParamDecoder
+
+    QueryParamCodec.from[LocalDate](
+      localDateQueryParamDecoder(formatter), localDateQueryParamEncoder(formatter)
+    )
+  }
 }
 
 /**
@@ -97,6 +114,16 @@ object QueryParamEncoder {
   def instantQueryParamEncoder(formatter: DateTimeFormatter): QueryParamEncoder[Instant] =
     QueryParamEncoder[String].contramap[Instant] { i: Instant =>
       formatter.format(i)
+    }
+
+  def zonedDateTimeQueryParamEncoder(formatter: DateTimeFormatter): QueryParamEncoder[ZonedDateTime] =
+    QueryParamEncoder[String].contramap[ZonedDateTime] { date: ZonedDateTime =>
+      formatter.format(date)
+    }
+
+  def localDateQueryParamEncoder(formatter: DateTimeFormatter): QueryParamEncoder[LocalDate] =
+    QueryParamEncoder[String].contramap[LocalDate] { date: LocalDate =>
+      formatter.format(date)
     }
 
   @deprecated("Use QueryParamEncoder[U].contramap(f)", "0.16")
@@ -192,6 +219,33 @@ object QueryParamDecoder {
             ParseFailure(s"Failed to decode value: ${value.value} as Instant", e.getMessage)
           }
           .toValidatedNel
+    }
+
+  def zonedDateTimeQueryParamDecoder(formatter: DateTimeFormatter): QueryParamDecoder[ZonedDateTime] =
+    new QueryParamDecoder[ZonedDateTime] {
+      override def decode(value: QueryParameterValue): ValidatedNel[ParseFailure, ZonedDateTime] = {
+        Validated
+          .catchOnly[DateTimeParseException] {
+          ZonedDateTime.parse(value.value, formatter)
+        }
+        .leftMap { e =>
+          ParseFailure(s"Failed to decode value: ${value.value} as ZonedDateTime", e.getMessage)
+        }
+        .toValidatedNel
+      }
+    }
+
+  def localDateQueryParamDecoder(formatter: DateTimeFormatter): QueryParamDecoder[LocalDate] =
+    new QueryParamDecoder[LocalDate] {
+      override def decode(value: QueryParameterValue): ValidatedNel[ParseFailure, LocalDate] =
+        Validated
+          .catchOnly[DateTimeParseException] {
+          LocalDate.parse(value.value, formatter)
+        }
+        .leftMap { e =>
+          ParseFailure(s"Failed to decode value: ${value.value} as LocalDate", e.getMessage)
+
+        }.toValidatedNel
     }
 
   /** QueryParamDecoder is a covariant functor. */
